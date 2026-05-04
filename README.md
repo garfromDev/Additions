@@ -14,7 +14,7 @@ voir ![addition_juste](./addition_juste.png) et [addition_fausse](./addition_fau
 
 
 ## contrainte impérative
-Doit fonctionner avec la navigateur safari sous iOS
+Doit fonctionner avec le navigateur safari sous iOS
 
 ## objectifs (si possible)
 l'application fonctionne sans appels à des API ou sites extérieurs.

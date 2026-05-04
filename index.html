@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Additions</title>
+  <style>
+    :root {
+      --bg: #f2f2f7;
+      --surface: #ffffff;
+      --text: #1a1a1a;
+      --text-secondary: #666666;
+      --border: #e0e0e0;
+      --primary: #007aff;
+      --primary-text: #ffffff;
+      --correct: #34c759;
+      --correct-bg: #f0fdf4;
+      --wrong: #ff3b30;
+      --wrong-bg: #fff0f0;
+      --radius: 14px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1c1c1e;
+        --surface: #2c2c2e;
+        --text: #f2f2f7;
+        --text-secondary: #aeaeb2;
+        --border: #3a3a3c;
+        --correct-bg: #0d2818;
+        --wrong-bg: #2d0a0a;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 16px;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      padding:
+        max(20px, env(safe-area-inset-top))
+        max(16px, env(safe-area-inset-right))
+        max(20px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+      overflow-y: auto;
+    }
+
+    .screen.active { opacity: 1; pointer-events: all; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: block; width: 100%;
+      padding: 16px; border: none; border-radius: var(--radius);
+      font-size: 17px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
+    }
+    .btn:active { opacity: 0.7; }
+    .btn-primary  { background: var(--primary); color: var(--primary-text); margin-bottom: 12px; }
+    .btn-secondary{ background: var(--surface); color: var(--primary); border: 1.5px solid var(--border); margin-bottom: 12px; }
+    .btn-ghost    { background: transparent; color: var(--text-secondary); font-size: 14px; padding: 10px; margin-bottom: 0; }
+
+    /* ── Screen: Capture ── */
+    #screen-capture { justify-content: space-between; }
+
+    .header-area h1  { font-size: 26px; font-weight: 700; margin-bottom: 2px; }
+    .header-area p   { font-size: 14px; color: var(--text-secondary); margin-bottom: 16px; }
+
+    .preview-area {
+      flex: 1;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 2px dashed var(--border);
+      margin-bottom: 16px;
+      min-height: 180px;
+      overflow: hidden;
+    }
+
+    .preview-area img { max-width: 100%; max-height: 360px; display: block; border-radius: calc(var(--radius) - 2px); }
+
+    .preview-placeholder { text-align: center; color: var(--text-secondary); }
+    .preview-placeholder .ph-icon { font-size: 48px; display: block; margin-bottom: 8px; }
+
+    .error-banner {
+      background: var(--wrong-bg); border: 1px solid var(--wrong);
+      border-radius: 10px; padding: 12px 14px;
+      font-size: 14px; color: var(--wrong);
+      margin-bottom: 12px; display: none;
+    }
+    .error-banner.visible { display: block; }
+
+    .settings-link { text-align: center; }
+
+    /* ── Screen: Processing ── */
+    #screen-processing {
+      align-items: center; justify-content: center; gap: 18px;
+    }
+
+    #processing-thumb {
+      width: 96px; height: 96px;
+      border-radius: var(--radius); object-fit: cover;
+      border: 2px solid var(--border);
+    }
+
+    .spinner {
+      width: 38px; height: 38px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #status-text { color: var(--text-secondary); font-size: 15px; }
+
+    /* ── Screen: Result ── */
+    #screen-result { justify-content: space-between; }
+    #screen-result h2 { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+
+    .verdict-card {
+      flex: 1;
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      margin-bottom: 16px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      border-width: 2px; border-style: solid;
+    }
+    .verdict-card.correct { background: var(--correct-bg); border-color: var(--correct); }
+    .verdict-card.wrong   { background: var(--wrong-bg);   border-color: var(--wrong); }
+
+    .verdict-icon  { font-size: 52px; line-height: 1; }
+    .verdict-label { font-size: 28px; font-weight: 800; letter-spacing: 0.5px; }
+    .verdict-card.correct .verdict-label { color: var(--correct); }
+    .verdict-card.wrong   .verdict-label { color: var(--wrong); }
+
+    .expression {
+      background: var(--surface);
+      border-radius: 10px; padding: 16px 20px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 20px; text-align: right;
+      width: 100%; max-width: 300px;
+      border: 1px solid var(--border);
+    }
+    .expression .eline { padding: 2px 0; white-space: pre; }
+    .expression .rule  { border-top: 1.5px solid var(--text); margin: 6px 0; }
+    .expression .eline.total { font-weight: 700; }
+
+    .written-result {
+      font-size: 15px; color: var(--text-secondary); text-align: center; line-height: 1.6;
+    }
+    .wrong-val   { color: var(--wrong);   font-weight: 700; text-decoration: line-through; }
+    .correct-val { color: var(--correct); font-weight: 700; }
+
+    /* ── Screen: Settings (overlay) ── */
+    #screen-settings {
+      background: rgba(0,0,0,0.45);
+      padding: 0; z-index: 10;
+      justify-content: flex-end;
+    }
+
+    .overlay-sheet {
+      background: var(--surface);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 24px
+        max(16px, env(safe-area-inset-right))
+        max(32px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+    }
+
+    .overlay-sheet h2 { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+
+    .s-row   { margin-bottom: 16px; }
+    .s-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px; }
+
+    .seg {
+      display: flex; background: var(--bg);
+      border-radius: 9px; padding: 2px;
+    }
+    .seg button {
+      flex: 1; padding: 9px 8px; border: none; border-radius: 7px;
+      font-size: 14px; font-weight: 500;
+      background: transparent; color: var(--text-secondary);
+      cursor: pointer; touch-action: manipulation; transition: all 0.15s;
+    }
+    .seg button.active {
+      background: var(--surface); color: var(--text); font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+
+    .api-key-row { display: none; }
+    .api-key-row.visible { display: block; }
+
+    .input-field {
+      width: 100%; padding: 12px 14px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 15px; background: var(--surface); color: var(--text);
+      outline: none; -webkit-appearance: none;
+    }
+    .input-field:focus { border-color: var(--primary); }
+
+    .s-hint { font-size: 12px; color: var(--text-secondary); margin-top: 6px; line-height: 1.5; }
+
+    .s-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .s-actions .btn { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+
+  <!-- Écran 1 : Capture -->
+  <div id="screen-capture" class="screen active">
+    <div class="header-area">
+      <h1>Additions</h1>
+      <p>Photographiez une addition manuscrite</p>
+    </div>
+    <div class="preview-area" id="preview-area">
+      <div class="preview-placeholder" id="preview-placeholder">
+        <span class="ph-icon">📸</span>
+        <span>Aucune photo sélectionnée</span>
+      </div>
+      <img id="preview-img" alt="Aperçu" style="display:none">
+    </div>
+    <div>
+      <div id="error-banner" class="error-banner"></div>
+      <button class="btn btn-primary" id="btn-camera">📷&nbsp; Prendre une photo</button>
+      <button class="btn btn-secondary" id="btn-gallery">🖼&nbsp; Choisir depuis la galerie</button>
+      <button class="btn btn-primary" id="btn-analyze" style="display:none">Analyser l'addition</button>
+      <div class="settings-link">
+        <button class="btn btn-ghost" id="btn-settings">⚙&nbsp; Paramètres OCR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Écran 2 : Traitement -->
+  <div id="screen-processing" class="screen">
+    <img id="processing-thumb" alt="">
+    <div class="spinner"></div>
+    <p id="status-text">Analyse en cours…</p>
+  </div>
+
+  <!-- Écran 3 : Résultat -->
+  <div id="screen-result" class="screen">
+    <div><h2>Résultat</h2></div>
+    <div id="verdict-card" class="verdict-card">
+      <div id="verdict-icon" class="verdict-icon"></div>
+      <div id="verdict-label" class="verdict-label"></div>
+      <div id="expression" class="expression"></div>
+      <div id="written-result" class="written-result"></div>
+    </div>
+    <div>
+      <button class="btn btn-primary" id="btn-retry">Nouvelle photo</button>
+    </div>
+  </div>
+
+  <!-- Écran 4 : Paramètres (overlay) -->
+  <div id="screen-settings" class="screen">
+    <div class="overlay-sheet">
+      <h2>Paramètres</h2>
+      <div class="s-row">
+        <div class="s-label">Moteur OCR</div>
+        <div class="seg">
+          <button id="seg-tesseract" class="active">Tesseract (défaut)</button>
+          <button id="seg-openai">OpenAI API</button>
+        </div>
+      </div>
+      <div class="s-row api-key-row" id="api-key-row">
+        <div class="s-label">Clé API OpenAI</div>
+        <input type="password" class="input-field" id="api-key-input" placeholder="sk-…" autocomplete="off">
+        <div class="s-hint">La clé est stockée uniquement sur cet appareil.<br>Obtenez une clé sur platform.openai.com — modèle : gpt-4o-mini (~0,001 €/photo).</div>
+      </div>
+      <div class="s-actions">
+        <button class="btn btn-primary" id="btn-settings-save">Enregistrer</button>
+        <button class="btn btn-secondary" id="btn-settings-cancel">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inputs cachés -->
+  <input type="file" accept="image/*" capture="environment" id="input-camera" hidden>
+  <input type="file" accept="image/*" id="input-gallery" hidden>
+  <canvas id="processing-canvas" hidden></canvas>
+
+  <script>
+  (() => {
+    'use strict';
+
+    // ── State ──────────────────────────────────────────────────────────────
+    const state = {
+      imageDataURL: null,
+      ocrEngine: localStorage.getItem('ocrEngine') || 'tesseract',
+      apiKey: localStorage.getItem('apiKey') || '',
+    };
+
+    // ── DOM helpers ────────────────────────────────────────────────────────
+    const $ = id => document.getElementById(id);
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      $(id).classList.add('active');
+    }
+
+    function setStatus(text) { $('status-text').textContent = text; }
+
+    function showError(msg) {
+      const el = $('error-banner');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    function clearError() { $('error-banner').classList.remove('visible'); }
+
+    // ── Image capture ──────────────────────────────────────────────────────
+    function handleFile(file) {
+      if (!file) return;
+      clearError();
+      const reader = new FileReader();
+      reader.onload = e => {
+        state.imageDataURL = e.target.result;
+        const img = $('preview-img');
+        img.src = e.target.result;
+        img.style.display = 'block';
+        $('preview-placeholder').style.display = 'none';
+        $('btn-analyze').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Synchronous trigger from user gesture (required by iOS Safari)
+    $('btn-camera').addEventListener('click',  () => $('input-camera').click());
+    $('btn-gallery').addEventListener('click', () => $('input-gallery').click());
+    $('input-camera').addEventListener('change',  e => handleFile(e.target.files[0]));
+    $('input-gallery').addEventListener('change', e => handleFile(e.target.files[0]));
+
+    $('btn-analyze').addEventListener('click', () => { if (state.imageDataURL) analyze(); });
+
+    $('btn-retry').addEventListener('click', () => {
+      state.imageDataURL = null;
+      const img = $('preview-img');
+      img.style.display = 'none';
+      img.src = '';
+      $('preview-placeholder').style.display = '';
+      $('btn-analyze').style.display = 'none';
+      $('input-camera').value = '';
+      $('input-gallery').value = '';
+      clearError();
+      showScreen('screen-capture');
+    });
+
+    // ── Settings ───────────────────────────────────────────────────────────
+    function applyEngine(engine) {
+      state.ocrEngine = engine;
+      $('seg-tesseract').classList.toggle('active', engine === 'tesseract');
+      $('seg-openai').classList.toggle('active', engine === 'openai');
+      $('api-key-row').classList.toggle('visible', engine === 'openai');
+    }
+
+    $('btn-settings').addEventListener('click', () => {
+      applyEngine(state.ocrEngine);
+      $('api-key-input').value = state.apiKey;
+      showScreen('screen-settings');
+    });
+    $('seg-tesseract').addEventListener('click', () => applyEngine('tesseract'));
+    $('seg-openai').addEventListener('click',    () => applyEngine('openai'));
+
+    $('btn-settings-save').addEventListener('click', () => {
+      localStorage.setItem('ocrEngine', state.ocrEngine);
+      state.apiKey = $('api-key-input').value.trim();
+      localStorage.setItem('apiKey', state.apiKey);
+      showScreen('screen-capture');
+    });
+    $('btn-settings-cancel').addEventListener('click', () => {
+      applyEngine(localStorage.getItem('ocrEngine') || 'tesseract');
+      showScreen('screen-capture');
+    });
+
+    // ── Image preprocessing (Canvas 2D) ────────────────────────────────────
+    function preprocessImage(dataURL) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 1800;
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if (w > MAX || h > MAX) {
+            if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+            else        { w = Math.round(w * MAX / h); h = MAX; }
+          }
+          const canvas = $('processing-canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          const imgData = ctx.getImageData(0, 0, w, h);
+          const data = imgData.data;
+
+          // Grayscale
+          const gray = new Uint8Array(w * h);
+          for (let i = 0; i < w * h; i++) {
+            gray[i] = Math.round(0.299 * data[i*4] + 0.587 * data[i*4+1] + 0.114 * data[i*4+2]);
+          }
+
+          // Adaptive threshold: sample every 4px in the block for speed
+          const BS = 32, C = 12;
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              const x0 = Math.max(0, x - BS), x1 = Math.min(w - 1, x + BS);
+              const y0 = Math.max(0, y - BS), y1 = Math.min(h - 1, y + BS);
+              let sum = 0, n = 0;
+              for (let by = y0; by <= y1; by += 4) {
+                for (let bx = x0; bx <= x1; bx += 4) {
+                  sum += gray[by * w + bx]; n++;
+                }
+              }
+              const val = gray[y * w + x] < (sum / n) - C ? 0 : 255;
+              const idx = (y * w + x) * 4;
+              data[idx] = data[idx+1] = data[idx+2] = val;
+              data[idx+3] = 255;
+            }
+          }
+          ctx.putImageData(imgData, 0, 0);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.src = dataURL;
+      });
+    }
+
+    // ── OpenAI Vision OCR ─────────────────────────────────────────────────
+    async function ocrWithOpenAI(dataURL, apiKey) {
+      const base64 = dataURL.split(',')[1];
+      const mime   = dataURL.split(';')[0].split(':')[1];
+
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          max_tokens: 256,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
+              { type: 'text', text: `Tu regardes une photo d'une addition posée manuellement à la française.
+
+CONTEXTE IMPORTANT :
+- Les nombres sont écrits en notation française : la VIRGULE (,) est le séparateur décimal (ex: 2589,02 = deux mille cinq cent quatre-vingt-neuf virgule deux).
+- L'addition est posée verticalement : les termes sont empilés, séparés par un trait horizontal, et le résultat est écrit en dessous.
+- Des petits chiffres de RETENUE sont parfois écrits en haut à gauche de certaines colonnes (ex: un petit "1" ou "11" flottant au-dessus de la première ligne). Ce sont des aides au calcul, PAS des chiffres appartenant aux termes de l'addition. Il faut absolument les ignorer.
+- Le signe "+" apparaît à gauche des termes (sauf le premier).
+
+TÂCHE :
+1. Identifie les termes de l'addition (ignore toute retenue).
+2. Identifie le résultat écrit sous le trait.
+3. Convertis les virgules décimales en points pour le JSON.
+
+Réponds UNIQUEMENT avec un objet JSON valide, sans markdown ni explication :
+{"addends": [nombre, ...], "written_result": nombre}
+
+Exemple : pour "2589,02 + 575,89 = 3164,91" → {"addends": [2589.02, 575.89], "written_result": 3164.91}` }
+            ]
+          }]
+        })
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error?.message || `Erreur API ${resp.status}`);
+      }
+
+      const result = await resp.json();
+      const text = result.choices[0].message.content.trim();
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('Réponse API invalide. Réessayez.');
+      return JSON.parse(match[0]);
+    }
+
+    // ── Tesseract OCR ──────────────────────────────────────────────────────
+    let tesseractWorker = null;
+
+    async function ocrWithTesseract(preprocessedDataURL) {
+      if (!window.Tesseract) {
+        setStatus('Chargement de Tesseract.js…');
+        await new Promise((ok, fail) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+          s.onload = ok;
+          s.onerror = () => fail(new Error('Impossible de charger Tesseract.js. Vérifiez votre connexion internet ou activez OpenAI API dans les paramètres.'));
+          document.head.appendChild(s);
+        });
+      }
+
+      if (!tesseractWorker) {
+        setStatus('Initialisation du moteur OCR…');
+        tesseractWorker = await Tesseract.createWorker('fra', 1, {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              setStatus(`Reconnaissance : ${Math.round(m.progress * 100)} %`);
+            }
+          },
+        });
+        await tesseractWorker.setParameters({
+          tessedit_char_whitelist: '0123456789,+= \n',
+          tessedit_pageseg_mode: '6',
+        });
+      }
+
+      setStatus('Lecture des chiffres…');
+      const { data: { text } } = await tesseractWorker.recognize(preprocessedDataURL);
+      return parseOCRText(text);
+    }
+
+    // ── Expression parser ──────────────────────────────────────────────────
+    function parseOCRText(rawText) {
+      const numbers = [];
+      for (const raw of rawText.split('\n')) {
+        const line = raw.trim();
+        if (!line) continue;
+        if (/^[-_=\s]+$/.test(line)) continue;          // séparateur horizontal
+        const stripped = line.replace(/^[+=\s]+/, '');  // retirer préfixe + ou =
+        const numStr = stripped.replace(/[^0-9,]/g, '').replace(',', '.');
+        if (!numStr) continue;
+        const val = parseFloat(numStr);
+        if (!isNaN(val) && isFinite(val)) numbers.push(val);
+      }
+
+      if (numbers.length < 2) {
+        throw new Error('Impossible de lire l\'addition. Vérifiez la luminosité et la mise au point, puis réessayez.');
+      }
+
+      const written_result = numbers[numbers.length - 1];
+      const addends = numbers.slice(0, -1);
+      const maxAddend = Math.max(...addends);
+
+      // Sanity check : le résultat doit être dans le même ordre de grandeur
+      if (written_result < maxAddend * 0.05) {
+        throw new Error('Lecture incorrecte. La photo n\'est peut-être pas assez nette.');
+      }
+
+      return { addends, written_result };
+    }
+
+    // ── Calculator (sans erreur flottante) ─────────────────────────────────
+    function addDecimals(nums) {
+      const maxDec = Math.max(...nums.map(n => {
+        const s = n.toString(), dot = s.indexOf('.');
+        return dot === -1 ? 0 : s.length - dot - 1;
+      }));
+      const f = Math.pow(10, maxDec);
+      return nums.reduce((acc, n) => acc + Math.round(n * f), 0) / f;
+    }
+
+    function formatFR(n) {
+      // Format number with comma as decimal separator, French style
+      return n.toString().replace('.', ',');
+    }
+
+    // ── Main flow ──────────────────────────────────────────────────────────
+    async function analyze() {
+      showScreen('screen-processing');
+      $('processing-thumb').src = state.imageDataURL;
+      setStatus('Préparation de l\'image…');
+
+      try {
+        let parsed;
+
+        if (state.ocrEngine === 'openai') {
+          if (!state.apiKey) throw new Error('Clé API OpenAI manquante. Configurez-la dans les paramètres.');
+          setStatus('Envoi à OpenAI…');
+          parsed = await ocrWithOpenAI(state.imageDataURL, state.apiKey);
+        } else {
+          const processed = await preprocessImage(state.imageDataURL);
+          parsed = await ocrWithTesseract(processed);
+        }
+
+        setStatus('Calcul…');
+        const { addends, written_result } = parsed;
+        const correct = addDecimals(addends);
+        const isCorrect = Math.abs(correct - written_result) < 0.005;
+
+        displayResult(addends, written_result, correct, isCorrect);
+        showScreen('screen-result');
+
+      } catch (err) {
+        showScreen('screen-capture');
+        showError(err.message || 'Une erreur est survenue.');
+      }
+    }
+
+    // ── Result display ─────────────────────────────────────────────────────
+    function displayResult(addends, writtenResult, correctResult, isCorrect) {
+      const card = $('verdict-card');
+      card.className = 'verdict-card ' + (isCorrect ? 'correct' : 'wrong');
+      $('verdict-icon').textContent  = isCorrect ? '✅' : '❌';
+      $('verdict-label').textContent = isCorrect ? 'CORRECT' : 'INCORRECT';
+
+      // Expression verticale
+      const allVals = [...addends, correctResult].map(n => formatFR(n));
+      const maxLen = Math.max(...allVals.map(s => s.length));
+      let html = '';
+      addends.forEach((n, i) => {
+        const prefix = i === 0 ? '  ' : '+ ';
+        html += `<div class="eline">${prefix}${formatFR(n).padStart(maxLen)}</div>`;
+      });
+      html += '<div class="rule"></div>';
+      html += `<div class="eline total">  ${formatFR(correctResult).padStart(maxLen)}</div>`;
+      $('expression').innerHTML = html;
+
+      // Résultat écrit vs juste
+      const wr = $('written-result');
+      if (isCorrect) {
+        wr.innerHTML = '';
+      } else {
+        wr.innerHTML =
+          `Écrit : <span class="wrong-val">${formatFR(writtenResult)}</span><br>` +
+          `Juste : <span class="correct-val">${formatFR(correctResult)}</span>`;
+      }
+    }
+
+  })();
+  </script>
+</body>
+</html>
