@@ -141,6 +141,14 @@
     .wrong-val   { color: var(--wrong);   font-weight: 700; text-decoration: line-through; }
     .correct-val { color: var(--correct); font-weight: 700; }
 
+    .reading-warning {
+      background: #fff8e1; border: 1.5px solid #f59e0b;
+      border-radius: 10px; padding: 12px 14px;
+      font-size: 13px; color: #92400e; line-height: 1.5;
+      text-align: left; margin-top: 10px; display: none;
+    }
+    .reading-warning.visible { display: block; }
+
     /* ── Screen: Settings (overlay) ── */
     #screen-settings { background: rgba(0,0,0,0.45); padding: 0; z-index: 10; justify-content: flex-end; }
     .overlay-sheet {
@@ -226,6 +234,9 @@
       <div id="expression"     class="expression"></div>
       <div id="written-result" class="written-result"></div>
     </div>
+    <div id="reading-warning" class="reading-warning">
+      ⚠️ La lecture semble incohérente. Si l'addition a des retenues, effacez-les au crayon puis reprenez la photo.
+    </div>
     <div>
       <button class="btn btn-primary" id="btn-retry">Nouvelle photo</button>
     </div>
@@ -249,7 +260,7 @@
       <div class="s-row key-row" id="key-row-gemini">
         <div class="s-label">Clé API Google Gemini</div>
         <input type="password" class="input-field" id="key-gemini" placeholder="AIza…" autocomplete="off">
-        <div class="s-hint">Clé gratuite sur aistudio.google.com (1 500 req/jour).<br>Modèle : gemini-2.0-flash.</div>
+        <div class="s-hint">Clé gratuite sur aistudio.google.com (1 500 req/jour).<br>Modèle : gemini-2.5-flash.</div>
       </div>
 
       <!-- OpenAI -->
@@ -288,18 +299,16 @@
 CONTEXTE :
 - Notation française : la VIRGULE (,) est le séparateur décimal (ex: 2589,02).
 - Layout vertical : termes empilés, trait horizontal, résultat en dessous.
-- RETENUES : de PETITS chiffres (souvent "1" ou "11") écrits en EXPOSANT au-dessus de la première ligne, nettement plus petits que les chiffres des termes. Ils sont décalés vers le haut. Ignore-les absolument — ils ne font pas partie des termes.
+- RETENUES : de PETITS chiffres (souvent "1" ou "11") écrits en EXPOSANT au-dessus de la première ligne, nettement plus petits que les chiffres des termes. Ce sont des aides au calcul — ignore-les absolument.
 - Le signe "+" apparaît à gauche des termes (sauf le premier).
 
 TÂCHE :
-1. Identifie les termes de l'addition (ignore les retenues).
-2. Identifie le résultat écrit sous le trait.
-3. Convertis les virgules décimales en points pour le JSON.
-
-Réponds UNIQUEMENT avec un JSON valide, sans markdown :
+1. Lis les termes (en ignorant les retenues) et le résultat écrit sous le trait.
+2. Vérifie la cohérence : la somme des termes doit être dans le même ordre de grandeur que le résultat écrit (à quelques unités près). Si ce n'est pas le cas, tu as probablement inclus une retenue dans un terme — relis ce terme.
+3. Retourne UNIQUEMENT ce JSON (virgules → points) :
 {"addends": [nombre, ...], "written_result": nombre}
 
-Exemple : "2589,02 + 575,89 = 3164,91" → {"addends": [2589.02, 575.89], "written_result": 3164.91}`;
+Exemple : "2589,02 + 575,89 = 2559,91" avec retenues "1 1" en haut → {"addends": [2589.02, 575.89], "written_result": 2559.91}`;
 
     // ── State ──────────────────────────────────────────────────────────────
     const state = {
@@ -406,7 +415,7 @@ Exemple : "2589,02 + 575,89 = 3164,91" → {"addends": [2589.02, 575.89], "writt
       const mime   = dataURL.split(';')[0].split(':')[1];
 
       const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -708,6 +717,12 @@ Exemple : "2589,02 + 575,89 = 3164,91" → {"addends": [2589.02, 575.89], "writt
       wr.innerHTML = isCorrect ? '' :
         `Écrit : <span class="wrong-val">${formatFR(writtenResult)}</span><br>` +
         `Juste : <span class="correct-val">${formatFR(correctResult)}</span>`;
+
+      const ref = Math.max(Math.abs(correctResult), Math.abs(writtenResult), 1);
+      const relDiff = Math.abs(correctResult - writtenResult) / ref;
+      const warn = $('reading-warning');
+      if (relDiff > 0.25) warn.classList.add('visible');
+      else warn.classList.remove('visible');
     }
 
   })();
