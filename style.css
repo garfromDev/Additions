@@ -147,6 +147,7 @@ html, body {
 .cell-input.op-input     { width: 26px; text-align: center; padding: 3px 2px; }
 .cell-input.input-error  { border-color: var(--wrong); }
 .result-op { color: var(--text-secondary); font-family: 'Courier New', monospace; font-size: 12px; }
+.tok-group  { display: inline-flex; align-items: center; white-space: nowrap; gap: 2px; }
 .correct-val { font-size: 12px; color: var(--correct); }
 
 /* Screen: Settings */

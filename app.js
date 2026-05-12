@@ -416,7 +416,22 @@ Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication.`;
   }
 
   function makeOpInput(val, rowIdx, tokIdx) {
-    return `<input type="text" class="cell-input op-input" value="${val}" data-row="${rowIdx}" data-field="tok_${tokIdx}">`;
+    return `<input type="text" class="cell-input op-input" value="${val}" data-row="${rowIdx}" data-field="tok_${tokIdx}" maxlength="1">`;
+  }
+
+  function groupTokenIndices(tokens) {
+    const groups = [];
+    let cur = [];
+    tokens.forEach((t, i) => {
+      if (typeof t === 'string' && t !== '(' && t !== ')') {
+        if (cur.length) groups.push(cur);
+        cur = [i];
+      } else {
+        cur.push(i);
+      }
+    });
+    if (cur.length) groups.push(cur);
+    return groups;
   }
 
   function renderTableBody() {
@@ -441,10 +456,14 @@ Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication.`;
       if (type === 'distributed') {
         formulaHTML = makeInput(row.input, i, 'input');
       } else if (type === 'vector') {
-        formulaHTML = row.tokens.map((t, ti) => {
-          if (typeof t === 'number') return makeInput(t, i, `tok_${ti}`);
-          if (t === '(' || t === ')') return `<span class="result-op">${t}</span>`;
-          return makeOpInput(t, i, ti);
+        formulaHTML = groupTokenIndices(row.tokens).map(indices => {
+          const parts = indices.map(idx => {
+            const t = row.tokens[idx];
+            if (typeof t === 'number') return makeInput(t, i, `tok_${idx}`);
+            if (t === '(' || t === ')') return `<span class="result-op">${t}</span>`;
+            return makeOpInput(t, i, idx);
+          }).join('');
+          return `<span class="tok-group">${parts}</span>`;
         }).join('');
       } else if (type === 'yield') {
         formulaHTML =
@@ -545,6 +564,12 @@ Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication.`;
     updateSummary();
   }
 
+  function filterNumericInput(input) {
+    const cleaned = input.value.replace(/[^0-9.,-]/g, '');
+    if (input.value !== cleaned) input.value = cleaned;
+    return cleaned;
+  }
+
   // Input delegation on result table
   $('result-tbody').addEventListener('input', e => {
     if (!e.target.matches('.cell-input')) return;
@@ -552,18 +577,22 @@ Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication.`;
     const field  = e.target.dataset.field;
     const row    = editState.rows[rowIdx];
 
-    // Operator token: string update, no float parsing
+    // Operator token: only allow operator characters
     if (field.startsWith('tok_')) {
       const idx = +field.slice(4);
       if (typeof row.tokens[idx] === 'string') {
-        row.tokens[idx] = e.target.value.trim() || row.tokens[idx];
+        const cleaned = e.target.value.replace(/[^+\-*/×÷]/g, '').slice(0, 1);
+        if (e.target.value !== cleaned) e.target.value = cleaned;
+        if (!cleaned) return;
+        row.tokens[idx] = cleaned;
         recomputeRow(rowIdx);
         updateSummary();
         return;
       }
     }
 
-    const value = parseFloat(e.target.value.replace(',', '.'));
+    const raw = filterNumericInput(e.target);
+    const value = parseFloat(raw.replace(',', '.'));
     if (isNaN(value)) return;
 
     if      (field === 'input')   row.input = value;
@@ -580,7 +609,8 @@ Réponds UNIQUEMENT avec le JSON valide, sans markdown, sans explication.`;
   // Scalar input for distributed type
   $('result-scalar-input').addEventListener('input', e => {
     if (!editState || editState.type !== 'distributed') return;
-    const value = parseFloat(e.target.value.replace(',', '.'));
+    const raw = filterNumericInput(e.target);
+    const value = parseFloat(raw.replace(',', '.'));
     if (isNaN(value)) return;
     editState.scalar = value;
     editState.rows.forEach((row, i) => { if (!row.na) recomputeRow(i); });
